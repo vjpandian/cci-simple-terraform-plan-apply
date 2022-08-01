@@ -1,0 +1,45 @@
+version: 2.1
+jobs:
+  plan-apply:
+    working_directory: /tmp/project
+    docker:
+      - image: hashicorp/terraform:light
+    steps:
+      - checkout
+      - run:
+          name: terraform init & plan
+          command: |
+            terraform init -input=false
+            terraform plan -out tfapply -var="aws_region=$AWS_DEFAULT_REGION" -var="aws_access_key=$AWS_ACCESS_KEY_ID" -var="aws_secret_key=$AWS_SECRET_ACCESS_KEY" -var="basename=demo4x"
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+    
+  apply:
+    docker:
+      - image: hashicorp/terraform:light
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: terraform
+          command: |
+            terraform apply -auto-approve tfapply
+          no_output_timeout: 3h     
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+
+workflows:
+   main:
+     jobs:
+        - plan-apply:
+        - hold-apply:
+             type: approval
+             requires:
+               - plan-apply
+        - apply:
+            requires:
+              - hold-apply
